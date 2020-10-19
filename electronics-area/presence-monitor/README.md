@@ -1,7 +1,7 @@
 # WiFi presence monitor
 Wireless presence monitor based on ESP8266 and PIR sensor.
 Data is sent and processed by ThingSpeak platform.
-
+[Public sensor dashboard](https://thingspeak.com/channels/1169359)
 
 # System architecture
 ESP8266 module
@@ -21,14 +21,19 @@ Device is designed to operate from battery power.
 Power calculations based on measurements done with oscilloscope are documented in excel files.
 Every 3s device wakes up with WiFi module disabled, and monitors state of PIR input.
 If input is high, then FLAG_LAST_PIR_STATE flag is set in NVRAM.
+
 Every 20s state of the flag is checked, and if set then message transmission is requested.
+
 Heartbeat message is sent every 30min even if motion was not detected.
 
 # TODO
-Temperature and humidity measurements
-Shutdown when battery voltage drops too low
-Visual low battery indicator
+
+ - Temperature and humidity measurements 
+ - Shutdown when battery voltage drops too low 
+ - Visual low battery indicator
 
 # Copyright
 Author: Michal Milkowski
-MIT license
+
+License: GPLv3
+
