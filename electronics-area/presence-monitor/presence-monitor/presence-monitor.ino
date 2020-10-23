@@ -48,6 +48,7 @@
 
 #define PIR_INPUT 13 // D7
 const float analogToVoltage = 110.5f;
+const float batteryRunningAvgCoeff = 0.0625;
 const uint32_t noActivityIntervalmSec = 30 * 60e3;
 const uint32_t pirActiveIntervalmSec = 20e3;
 const uint32_t sleepTimemSec = 3000;
@@ -77,6 +78,9 @@ struct nv_s {
     uint32_t flags;
     uint32_t lastResetTimemSec;
     uint32_t lastReportmSec;
+    int32_t connectFailures;
+    int32_t reportingFailures;
+    float batteryVoltage;
   } rtcData;
 };
 
@@ -129,8 +133,18 @@ void setup() {
 
 void loop() {
   // ------- data needed to determine if message needs to be sent ---------
+  // monitoring battery voltage - measurements are unstable, use weighted moving average
+  float rawVoltage = analogRead(A0) / analogToVoltage;
+  if(nv->rtcData.batteryVoltage == 0) {
+    nv->rtcData.batteryVoltage = rawVoltage;
+  } else {
+    nv->rtcData.batteryVoltage *= 1.0 - batteryRunningAvgCoeff;
+    nv->rtcData.batteryVoltage += rawVoltage * batteryRunningAvgCoeff;
+  }
   DEBUG_PRINT(F("Vin="));
-  DEBUG_PRINTLN(analogRead(A0) / analogToVoltage);
+  DEBUG_PRINTLN(rawVoltage);
+  DEBUG_PRINT(F("Vin(avg)="));
+  DEBUG_PRINTLN(nv->rtcData.batteryVoltage);
   pirActivated = digitalRead(PIR_INPUT);
   DEBUG_PRINT(F("PIR input: "));
   DEBUG_PRINTLN(pirActivated);
@@ -142,34 +156,46 @@ void loop() {
   // ------- decide if message needs to be sent now ----------
   // Throttle data send to specified intervals.
   // Send data more frequenly if PIR was activated in recent wakeups
+  // Back off for longer interval every 8th wifi connection failure saving battery
   bool sendData = false;
-  if(nv->rtcData.flags & FLAG_LAST_PIR_STATE || nv->rtcData.flags & FLAG_PIR_LAST_SEND) {
+  if((nv->rtcData.flags & FLAG_LAST_PIR_STATE || nv->rtcData.flags & FLAG_PIR_LAST_SEND)
+      && (nv->rtcData.connectFailures + 1) % 8 != 0) {
     sendData = hasIntervalElapsed(pirActiveIntervalmSec);
   } else {
     sendData = hasIntervalElapsed(noActivityIntervalmSec);
   }
 
+  if(nv->rtcData.batteryVoltage < 6.2) {
+    Serial.println("Low battery");
+  }
+
   // -------- Actual message transmission block ------------
   if(sendData && nv->rtcData.flags & FLAG_HAS_WIFI) {
-    ReportData data;
-    // Measure Signal Strength (RSSI) of Wi-Fi connection
-    data.pirSensor = nv->rtcData.flags & FLAG_LAST_PIR_STATE;
-    data.batteryVoltage = analogRead(A0) / analogToVoltage;
+    if(initWiFi()) {
+      ReportData data;
+      // Measure Signal Strength (RSSI) of Wi-Fi connection
+      data.pirSensor = nv->rtcData.flags & FLAG_LAST_PIR_STATE;
+      data.batteryVoltage = nv->rtcData.batteryVoltage;
+      data.wifiRssi = WiFi.RSSI();
+      data.connectFailures = nv->rtcData.connectFailures;
+      data.reportingFailures = nv->rtcData.reportingFailures;
     
-    initWiFi();
-    data.wifiRssi = WiFi.RSSI();
-  
-    if(sendReport(&data) == 0) {
-      // update nvram data after success
-      if(nv->rtcData.flags & FLAG_LAST_PIR_STATE) {
-        nv->rtcData.flags |= FLAG_PIR_LAST_SEND;
+      if(sendReport(&data) == 0) {
+        // update nvram data after success
+        if(nv->rtcData.flags & FLAG_LAST_PIR_STATE) {
+          nv->rtcData.flags |= FLAG_PIR_LAST_SEND;
+        } else {
+          nv->rtcData.flags &= ~FLAG_PIR_LAST_SEND;
+        }
+        nv->rtcData.flags &= ~FLAG_LAST_PIR_STATE; 
+        nv->rtcData.lastReportmSec = nv->rtcData.lastResetTimemSec + millis(); // crc will be updated before sleep
+        // confirm correct data send for deep sleep
+        sendData = false;
       } else {
-        nv->rtcData.flags &= ~FLAG_PIR_LAST_SEND;
+        nv->rtcData.reportingFailures++;
       }
-      nv->rtcData.flags &= ~FLAG_LAST_PIR_STATE; 
-      nv->rtcData.lastReportmSec = nv->rtcData.lastResetTimemSec + millis(); // crc will be updated before sleep
-      // confirm correct data send for deep sleep
-      sendData = false;
+    } else {
+      nv->rtcData.connectFailures++;
     }
     // Save current wifi state to nvram
     if(!WiFi.mode(WIFI_SHUTDOWN, &nv->wss)) {
@@ -201,12 +227,12 @@ void loop() {
 }
 
 bool hasIntervalElapsed(uint32_t intervalmSec) {
-  Serial.print("Last send time [ms]: ");
-  Serial.println(nv->rtcData.lastReportmSec);
-  Serial.print("Current time [ms]: ");
-  Serial.println(nv->rtcData.lastResetTimemSec + millis());
-  Serial.print("Interval [ms]: ");
-  Serial.println(intervalmSec);
+  DEBUG_PRINT(F("Last send time [ms]: "));
+  DEBUG_PRINTLN(nv->rtcData.lastReportmSec);
+  DEBUG_PRINT(F("Current time [ms]: "));
+  DEBUG_PRINTLN(nv->rtcData.lastResetTimemSec + millis());
+  DEBUG_PRINT(F("Interval [ms]: "));
+  DEBUG_PRINTLN(intervalmSec);
   return nv->rtcData.lastResetTimemSec + millis() - nv->rtcData.lastReportmSec > intervalmSec;
 }
 
@@ -220,17 +246,11 @@ void updateRTCcrc() {
   nv->crc32 = crc32((uint8_t*) &nv->rtcData, sizeof(nv->rtcData));
 }
 
-void initWiFi() {
+bool initWiFi() {
+  bool result = false;
   digitalWrite(LED_BUILTIN, LOW);  // give a visual indication that we're alive but busy with WiFi
   uint32_t wifiBegin = millis();  // how long does it take to connect
-//  if ((crc32((uint8_t*) &nv->rtcData.rstCount + 1, sizeof(nv->wss)) && !WiFi.shutdownValidCRC(&nv->wss))) {
-//    // if good copy of wss, overwrite invalid (primary) copy
-//    memcpy((uint32_t*) &nv->wss, (uint32_t*) &nv->rtcData.rstCount + 1, sizeof(nv->wss));
-//  }
-//  if (WiFi.shutdownValidCRC(&nv->wss)) {  // if we have a valid WiFi saved state
-//    memcpy((uint32_t*) &nv->rtcData.rstCount + 1, (uint32_t*) &nv->wss, sizeof(nv->wss)); // save a copy of it
-//  }
-    Serial.println(F("resuming WiFi"));
+  Serial.println(F("resuming WiFi"));
   if (!WiFi.mode(WIFI_RESUME, &nv->wss)) {  // couldn't resume, or no valid saved WiFi state yet
     /* Explicitly set the ESP8266 as a WiFi-client (STAtion mode), otherwise by default it
       would try to act as both a client and an access-point and could cause network issues
@@ -245,6 +265,7 @@ void initWiFi() {
     DEBUG_PRINT(F("my MAC: "));
     DEBUG_PRINTLN(WiFi.macAddress());
   }
+  digitalWrite(LED_BUILTIN, HIGH);
   wifiTimeout.reset(timeout);
   while (((!WiFi.localIP()) || (WiFi.status() != WL_CONNECTED)) && (!wifiTimeout)) {
     yield();
@@ -258,9 +279,10 @@ void initWiFi() {
     DEBUG_PRINTLN(WiFi.gatewayIP());
     DEBUG_PRINT(F("my IP address: "));
     DEBUG_PRINTLN(WiFi.localIP());
+    result = true;
   } else {
     Serial.println(F("WiFi timed out and didn't connect"));
   }
   WiFi.setAutoReconnect(true);
-  digitalWrite(LED_BUILTIN, HIGH);
+  return result;
 }

@@ -11,25 +11,13 @@ bool beginReporting() {
 
 int sendReport(ReportData *pData) {
     // Write value to Field 1 of a ThingSpeak Channel
-  int httpCode = ThingSpeak.setField(1, pData->wifiRssi);
-  if(httpCode != 200) {
-    Serial.println("Problem setting field 1");
-    return -1;
-  }
+  ThingSpeak.setField(1, pData->wifiRssi);
+  ThingSpeak.setField(2, pData->batteryVoltage);
+  ThingSpeak.setField(3, pData->pirSensor);
+  ThingSpeak.setField(4, pData->connectFailures);
+  ThingSpeak.setField(5, pData->reportingFailures);
 
-  httpCode = ThingSpeak.setField(2, pData->batteryVoltage);
-  if(httpCode != 200) {
-    Serial.println("Problem setting field 2");
-    return -1;
-  }
-
-  httpCode = ThingSpeak.setField(3, pData->pirSensor);
-  if(httpCode != 200) {
-    Serial.println("Problem setting field 3");
-    return -1;
-  }
-
-  httpCode = ThingSpeak.writeFields(myChannelNumber, myWriteAPIKey);
+  int httpCode = ThingSpeak.writeFields(myChannelNumber, myWriteAPIKey);
   if (httpCode == 200) {
     Serial.println("Channel write successful.");
   } else {
