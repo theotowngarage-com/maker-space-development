@@ -1,33 +1,12 @@
 /*
- ESP8266 --> ThingSpeak Channel
- 
- This sketch sends the Wi-Fi Signal Strength (RSSI) of an ESP8266 to a ThingSpeak
- channel using the ThingSpeak API (https://www.mathworks.com/help/thingspeak).
- 
- Requirements:
- 
-   * ESP8266 Wi-Fi Device
-   * Arduino 1.8.8+ IDE
-   * Additional Boards URL: http://arduino.esp8266.com/stable/package_esp8266com_index.json
-   * Library: esp8266 by ESP8266 Community
-   * Library: ThingSpeak by MathWorks
- 
- ThingSpeak Setup:
-   * https://github.com/mathworks/thingspeak-arduino
-   * Sign Up for New User Account - https://thingspeak.com/users/sign_up
-   * Create a new Channel by selecting Channels, My Channels, and then New Channel
-   * Enable one field
-   * Enter SECRET_CH_ID in "secrets.h"
-   * Enter SECRET_WRITE_APIKEY in "secrets.h"
- Setup Wi-Fi:
-  * Enter SECRET_SSID in "secrets.h"
-  * Enter SECRET_PASS in "secrets.h"
-  
- Tutorial: http://nothans.com/measure-wi-fi-signal-levels-with-the-esp8266-and-thingspeak
- GPIO: https://randomnerdtutorials.com/esp8266-pinout-reference-gpios/
- 
-   
- Created: Feb 1, 2017 by Hans Scharler (http://nothans.com)
+ * Write data to ThingSpeak channel
+ * Channels used:
+ * 1 - WiFi RSSI
+ * 2 - battery voltage (2S LiPo battery connected through voltage divider)
+ * 3 - PIR motion sensor state
+ * 4 - Number of WiFi connection failures
+ * 5 - Number of network errors while sending data
+ * 6 - Temperature
 */
 
 #include <ESP8266WiFi.h>
@@ -36,6 +15,7 @@
 #include <coredecls.h>         // crc32()
 #include <PolledTimeout.h>
 #include <include/WiFiState.h> // WiFiState structure details
+#include <DallasTemperature.h>
 
 #define DEBUG  // prints WiFi connection info to serial, uncomment if you want WiFi messages
 #ifdef DEBUG
@@ -47,11 +27,14 @@
 #endif
 
 #define PIR_INPUT 13 // D7
+#define ONE_WIRE_BUS 12 // D6
+
 const float analogToVoltage = 110.5f;
 const float batteryRunningAvgCoeff = 0.0625;
 const uint32_t noActivityIntervalmSec = 30 * 60e3;
 const uint32_t pirActiveIntervalmSec = 20e3;
 const uint32_t sleepTimemSec = 3000;
+const int temperatureResolutionBits = 9; // 9-12: higher resolution conversion uses more time
 
 char ssid[] = SECRET_SSID;   // your network SSID (name)
 char pass[] = SECRET_PASS;   // your network password
@@ -88,10 +71,14 @@ static nv_s* nv = (nv_s*)RTC_USER_MEM; // user RTC RAM area
 
 esp8266::polledTimeout::oneShotMs wifiTimeout(timeout);  // 30 second timeout on WiFi connection
 
+// Setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs)
+OneWire oneWire(ONE_WIRE_BUS);
+DallasTemperature sensors(&oneWire);
+uint8_t tempDeviceAddress;
+
 bool pirActivated = false;
 
 void wakeupCallback() {  // unlike ISRs, you can do a print() from a callback function
-  printMillis();  // show time difference across sleep; millis is wrong as the CPU eventually stops
   Serial.println(F("Woke from Light Sleep - this is the callback"));
 }
 
@@ -105,12 +92,11 @@ void setup() {
   DEBUG_PRINT(ESP.getCoreVersion());
   DEBUG_PRINT(F(", SDK Version: "));
   DEBUG_PRINTLN(ESP.getSdkVersion());
-  
+
+  #ifdef DEBUG
   String resetCause = ESP.getResetReason();
-  Serial.println(resetCause);
-//  if ((resetCause == "External System") || (resetCause == "Power on")) {
-//    Serial.println(F("Power on reset"));
-//  }
+  DEBUG_PRINTLN(resetCause);
+  #endif // DEBUG
 
   // Read data from RTC memory, if any
   uint32_t crcOfData = crc32((uint8_t*) &nv->rtcData, sizeof(nv->rtcData));
@@ -159,26 +145,28 @@ void loop() {
   // Back off for longer interval every 8th wifi connection failure saving battery
   bool sendData = false;
   if((nv->rtcData.flags & FLAG_LAST_PIR_STATE || nv->rtcData.flags & FLAG_PIR_LAST_SEND)
-      && (nv->rtcData.connectFailures + 1) % 8 != 0) {
+      && (nv->rtcData.connectFailures + nv->rtcData.reportingFailures + 1) % 8 != 0) {
     sendData = hasIntervalElapsed(pirActiveIntervalmSec);
   } else {
     sendData = hasIntervalElapsed(noActivityIntervalmSec);
   }
 
   if(nv->rtcData.batteryVoltage < 6.2) {
-    Serial.println("Low battery");
+    Serial.println("WARNING: Low battery");
   }
 
   // -------- Actual message transmission block ------------
   if(sendData && nv->rtcData.flags & FLAG_HAS_WIFI) {
+    ReportData data;
+    data.temperature = getTemperature();
+    data.pirSensor = nv->rtcData.flags & FLAG_LAST_PIR_STATE;
+    data.batteryVoltage = nv->rtcData.batteryVoltage;
+    data.connectFailures = nv->rtcData.connectFailures;
+    data.reportingFailures = nv->rtcData.reportingFailures;
+    
     if(initWiFi()) {
-      ReportData data;
       // Measure Signal Strength (RSSI) of Wi-Fi connection
-      data.pirSensor = nv->rtcData.flags & FLAG_LAST_PIR_STATE;
-      data.batteryVoltage = nv->rtcData.batteryVoltage;
       data.wifiRssi = WiFi.RSSI();
-      data.connectFailures = nv->rtcData.connectFailures;
-      data.reportingFailures = nv->rtcData.reportingFailures;
     
       if(sendReport(&data) == 0) {
         // update nvram data after success
@@ -199,7 +187,7 @@ void loop() {
     }
     // Save current wifi state to nvram
     if(!WiFi.mode(WIFI_SHUTDOWN, &nv->wss)) {
-      Serial.println(F("Failed to go to WIFI_SHUTDOWN"));
+      Serial.println(F("ERROR: Failed to go to WIFI_SHUTDOWN"));
     }
   }
 
@@ -236,10 +224,21 @@ bool hasIntervalElapsed(uint32_t intervalmSec) {
   return nv->rtcData.lastResetTimemSec + millis() - nv->rtcData.lastReportmSec > intervalmSec;
 }
 
-void printMillis() {
-  Serial.print(F("millis() = "));  // show that millis() isn't correct across most Sleep modes
-  Serial.println(millis());
-  Serial.flush();  // needs a Serial.flush() else it may not print the whole message before sleeping
+float getTemperature() {
+    sensors.begin();
+    DEBUG_PRINT(F("Temperature sensors: "));
+    DEBUG_PRINTLN(sensors.getDS18Count());
+    if(sensors.getDS18Count() > 0) {
+      sensors.getAddress(&tempDeviceAddress, 0);
+      sensors.setResolution(&tempDeviceAddress, temperatureResolutionBits);
+      sensors.setWaitForConversion(false);
+      sensors.requestTemperatures();
+      delay(750 / (1 << (12 - temperatureResolutionBits)));
+      DEBUG_PRINT(F("Temperature: "));
+      DEBUG_PRINTLN(sensors.getTempCByIndex(0));
+      return sensors.getTempCByIndex(0);
+    }
+    return -100.0;
 }
 
 void updateRTCcrc() {
@@ -250,7 +249,7 @@ bool initWiFi() {
   bool result = false;
   digitalWrite(LED_BUILTIN, LOW);  // give a visual indication that we're alive but busy with WiFi
   uint32_t wifiBegin = millis();  // how long does it take to connect
-  Serial.println(F("resuming WiFi"));
+  Serial.println(F("INFO: resuming WiFi"));
   if (!WiFi.mode(WIFI_RESUME, &nv->wss)) {  // couldn't resume, or no valid saved WiFi state yet
     /* Explicitly set the ESP8266 as a WiFi-client (STAtion mode), otherwise by default it
       would try to act as both a client and an access-point and could cause network issues
@@ -260,7 +259,7 @@ bool initWiFi() {
     WiFi.setOutputPower(10);  // reduce RF output power, increase if it won't connect
     WiFi.config(staticIP, gateway, subnet);  // if using static IP, enter parameters at the top
     WiFi.begin(ssid, pass);
-    Serial.print(F("connecting to WiFi "));
+    Serial.print(F("INFO: connecting to WiFi "));
     Serial.println(ssid);
     DEBUG_PRINT(F("my MAC: "));
     DEBUG_PRINTLN(WiFi.macAddress());
@@ -272,16 +271,16 @@ bool initWiFi() {
   }
   if ((WiFi.status() == WL_CONNECTED) && WiFi.localIP()) {
     DEBUG_PRINTLN(F("WiFi connected"));
-    Serial.print(F("WiFi connect time = "));
+    Serial.print(F("INFO: WiFi connect time = "));
     float reConn = (millis() - wifiBegin);
     Serial.printf("%1.2f seconds\n", reConn / 1000);
-    DEBUG_PRINT(F("WiFi Gateway IP: "));
+    DEBUG_PRINT(F("INFO: WiFi Gateway IP: "));
     DEBUG_PRINTLN(WiFi.gatewayIP());
-    DEBUG_PRINT(F("my IP address: "));
+    DEBUG_PRINT(F("INFO: my IP address: "));
     DEBUG_PRINTLN(WiFi.localIP());
     result = true;
   } else {
-    Serial.println(F("WiFi timed out and didn't connect"));
+    Serial.println(F("ERROR: WiFi timed out and didn't connect"));
   }
   WiFi.setAutoReconnect(true);
   return result;

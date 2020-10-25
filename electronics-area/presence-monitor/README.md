@@ -5,7 +5,9 @@ Data is sent and processed by ThingSpeak platform.
 
 # System architecture
 ESP8266 module
-Cheap PIR module
+Cheap PIR module connected to pin D7
+Maxim DS18B20 temperature sensor connected to pin D6
+
 Powered by 2S LiIon battery. Battery voltage is dropped to 5V by LDO linear regulator. 
 5V is needed to power PIR sensor. Voltage is further dropped from 5V to 3.3V to power ESP8266 module.
 
@@ -13,8 +15,13 @@ Powered by 2S LiIon battery. Battery voltage is dropped to 5V by LDO linear regu
 ## Sensors
 PIR sensor module signals high when motion is detected. PIR module is powered from 5V
 
+Temperature sensor is read before each data package is sent. Sensor is connected over 1wire bus, and powered from 5V. 
+In sleep mode current consumption does not exceed few uA. Conversion time is exponentialy dependent on resolution.
+Conversion is done before wifi is connected.
+
 ESP8266 is kept in deep sleep with WiFi radio disabled for as long as possible.
-State of PIR sensor is kept high for few seconds after motion was detected.
+State of PIR sensor is kept high for few seconds after motion was detected. This gives module time to wake up and read state
+every 3 seconds.
 
 ## Power considerations
 Device is designed to operate from battery power.
@@ -28,12 +35,17 @@ Heartbeat message is sent every 30min even if motion was not detected.
 
 # TODO
 
- - Temperature and humidity measurements 
  - Shutdown when battery voltage drops too low 
  - Visual low battery indicator
+ - Humidity measurements 
 
 # Copyright
 Author: Michal Milkowski
+
+# Credits
+Based on 
+- [ThingSpeak example](https://github.com/nothans/thingspeak-esp-examples/blob/master/examples/RSSI_to_ThingSpeak.ino) by Hans Scharler (http://nothans.com)
+- [DS18B20 example](https://github.com/milesburton/Arduino-Temperature-Control-Library/blob/master/examples/WaitForConversion2/WaitForConversion2.ino) by milesburton
 
 License: GPLv3
 

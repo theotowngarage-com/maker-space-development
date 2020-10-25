@@ -16,6 +16,7 @@ int sendReport(ReportData *pData) {
   ThingSpeak.setField(3, pData->pirSensor);
   ThingSpeak.setField(4, pData->connectFailures);
   ThingSpeak.setField(5, pData->reportingFailures);
+  ThingSpeak.setField(6, pData->temperature);
 
   int httpCode = ThingSpeak.writeFields(myChannelNumber, myWriteAPIKey);
   if (httpCode == 200) {

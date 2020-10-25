@@ -6,4 +6,5 @@ typedef struct{
   long wifiRssi;
   long connectFailures;
   long reportingFailures;
+  float temperature;
 } ReportData;
