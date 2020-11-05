@@ -9,7 +9,7 @@ Cheap PIR module connected to pin D7
 Maxim DS18B20 temperature sensor connected to pin D6
 
 Powered by 2S LiIon battery. Battery voltage is dropped to 5V by LDO linear regulator. 
-5V is needed to power PIR sensor. Voltage is further dropped from 5V to 3.3V to power ESP8266 module.
+5V is needed to power PIR, and temperature sensors. Voltage is further dropped from 5V to 3.3V to power ESP8266 module.
 
 # Theory of operation
 ## Sensors
@@ -29,13 +29,24 @@ Power calculations based on measurements done with oscilloscope are documented i
 Every 3s device wakes up with WiFi module disabled, and monitors state of PIR input.
 If input is high, then FLAG_LAST_PIR_STATE flag is set in NVRAM.
 
-Every 20s state of the flag is checked, and if set then message transmission is requested.
+Every 20s state of the flags in NVRAM is checked, and if set then message transmission is requested.
 
 Heartbeat message is sent every 30min even if motion was not detected.
 
+### Low battery
+Battery voltage is affected heavily by current draw, especially at low temperatures.
+Moving average is implemented to smooth out voltage measurements.
+
+When moving average drops below 6.2V then data transmission is inhibited, and duration of deep sleep cycle is 
+increased to 30s.
+
+### Communication errors handling
+Further battery savings are done when wifi or internet connection is down in more than 8 consecutive transmission attempts.
+When this condition is detected, then data transmission interval is increased to 30min, and deep sleep interval in increased to 30s.
+Error counters are cleared after successful data transmission.
+
 # TODO
 
- - Shutdown when battery voltage drops too low 
  - Visual low battery indicator
  - Humidity measurements 
 
