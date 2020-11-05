@@ -17,7 +17,7 @@
 #include <include/WiFiState.h> // WiFiState structure details
 #include <DallasTemperature.h>
 
-#define DEBUG  // prints WiFi connection info to serial, uncomment if you want WiFi messages
+//#define DEBUG  // prints WiFi connection info to serial, uncomment if you want WiFi messages
 #ifdef DEBUG
 #define DEBUG_PRINTLN(x)  Serial.println(x)
 #define DEBUG_PRINT(x)  Serial.print(x)
@@ -93,10 +93,8 @@ void setup() {
   DEBUG_PRINT(F(", SDK Version: "));
   DEBUG_PRINTLN(ESP.getSdkVersion());
 
-  #ifdef DEBUG
   String resetCause = ESP.getResetReason();
   DEBUG_PRINTLN(resetCause);
-  #endif // DEBUG
 
   // Read data from RTC memory, if any
   uint32_t crcOfData = crc32((uint8_t*) &nv->rtcData, sizeof(nv->rtcData));
@@ -118,6 +116,7 @@ void setup() {
 }
 
 void loop() {
+  uint32_t nextSleepTimemSec = sleepTimemSec;
   // ------- data needed to determine if message needs to be sent ---------
   // monitoring battery voltage - measurements are unstable, use weighted moving average
   float rawVoltage = analogRead(A0) / analogToVoltage;
@@ -144,15 +143,27 @@ void loop() {
   // Send data more frequenly if PIR was activated in recent wakeups
   // Back off for longer interval every 8th wifi connection failure saving battery
   bool sendData = false;
+  bool wifiErrorLimitExceeded = nv->rtcData.connectFailures + nv->rtcData.reportingFailures >= 8;
   if((nv->rtcData.flags & FLAG_LAST_PIR_STATE || nv->rtcData.flags & FLAG_PIR_LAST_SEND)
-      && (nv->rtcData.connectFailures + nv->rtcData.reportingFailures + 1) % 8 != 0) {
+      && !wifiErrorLimitExceeded) {
     sendData = hasIntervalElapsed(pirActiveIntervalmSec);
   } else {
     sendData = hasIntervalElapsed(noActivityIntervalmSec);
   }
 
+  // ----------- apply error condition filters ---------------
+  // disable transmissions, and increase deep sleep duration 
+  // when battery voltage is very low
   if(nv->rtcData.batteryVoltage < 6.2) {
     Serial.println("WARNING: Low battery");
+    // extreme power saving when battery low detected
+    nextSleepTimemSec *= 10;
+    sendData = false;
+  }
+
+  // increase deep sleep duration if wifi error limits is exceeded
+  if(wifiErrorLimitExceeded) {
+    nextSleepTimemSec *= 10;
   }
 
   // -------- Actual message transmission block ------------
@@ -179,6 +190,8 @@ void loop() {
         nv->rtcData.lastReportmSec = nv->rtcData.lastResetTimemSec + millis(); // crc will be updated before sleep
         // confirm correct data send for deep sleep
         sendData = false;
+        nv->rtcData.reportingFailures = 0;
+        nv->rtcData.connectFailures = 0;
       } else {
         nv->rtcData.reportingFailures++;
       }
@@ -205,9 +218,9 @@ void loop() {
     nv->rtcData.flags &= ~FLAG_HAS_WIFI;
     // keep track of time elapsed between resets - update immediately before entering sleep
     // time is adjusted for time spent in sleep
-    nv->rtcData.lastResetTimemSec += millis() + sleepTimemSec;
+    nv->rtcData.lastResetTimemSec += millis() + nextSleepTimemSec;
     updateRTCcrc();
-    ESP.deepSleep(sleepTimemSec * 1000, WAKE_RF_DISABLED);
+    ESP.deepSleep(nextSleepTimemSec * 1000, WAKE_RF_DISABLED);
   }
   while(true){
     yield();
