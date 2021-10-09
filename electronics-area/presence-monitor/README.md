@@ -3,6 +3,17 @@ Wireless presence monitor based on ESP8266 and PIR sensor.
 Data is sent and processed by ThingSpeak platform.
 [Public sensor dashboard](https://thingspeak.com/channels/1169359)
 
+# Dependencies
+DallasTemperature library (requires OneWire library)
+ThingSpeak library
+
+# Quick start
+1. Select your ESP8266 module board in Arduino.
+1. Install required libraries (look at Dependencies above)
+1. Optionally: enable debugg by uncommenting '#define DEBUG'
+1. Compile sketch
+1. Connect board with USB cable, and upload sketch
+
 # System architecture
 ESP8266 module
 Cheap PIR module connected to pin D7
@@ -39,6 +50,10 @@ Moving average is implemented to smooth out voltage measurements.
 
 When moving average drops below 6.2V then data transmission is inhibited, and duration of deep sleep cycle is 
 increased to 30s.
+
+### Battery not connected
+When battery voltage measured is below 1V, then module assumes it is powered with external power supply.
+In this mode extreme power saving options are disabled.
 
 ### Communication errors handling
 Further battery savings are done when wifi or internet connection is down in more than 8 consecutive transmission attempts.

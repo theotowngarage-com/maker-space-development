@@ -154,8 +154,11 @@ void loop() {
   // ----------- apply error condition filters ---------------
   // disable transmissions, and increase deep sleep duration 
   // when battery voltage is very low
-  if(nv->rtcData.batteryVoltage < 6.2) {
-    Serial.println("WARNING: Low battery");
+  // assume that external power supply is connected if battery voltage
+  // is measured below 1V
+  if(nv->rtcData.batteryVoltage < 6.2 && nv->rtcData.batteryVoltage > 1.0) {
+    Serial.print("WARNING: Low battery ");
+    Serial.println(nv->rtcData.batteryVoltage);
     // extreme power saving when battery low detected
     nextSleepTimemSec *= 10;
     sendData = false;
