@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="210mm"
+   height="297mm"
+   viewBox="0 0 210 297"
+   version="1.1"
+   id="svg1196"
+   inkscape:version="1.1.1 (3bf5ae0d25, 2021-09-20)"
+   sodipodi:docname="estop-holder.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview1198"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:pageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:document-units="mm"
+     showgrid="false"
+     showguides="true"
+     inkscape:guide-bbox="true"
+     inkscape:snap-bbox="false"
+     inkscape:snap-midpoints="true"
+     inkscape:zoom="2.1971895"
+     inkscape:cx="262.83577"
+     inkscape:cy="240.53456"
+     inkscape:window-width="1920"
+     inkscape:window-height="1057"
+     inkscape:window-x="-8"
+     inkscape:window-y="-8"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="layer1">
+    <sodipodi:guide
+       position="24.324636,254.61252"
+       orientation="1,0"
+       id="guide2011" />
+    <sodipodi:guide
+       position="74.298514,252.92666"
+       orientation="1,0"
+       id="guide2849" />
+  </sodipodi:namedview>
+  <defs
+     id="defs1193" />
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1">
+    <path
+       d="m 41.73657,56.732551 c 1.078997,3.312584 4.166367,5.555192 7.650189,5.556779 3.483451,0 6.570477,-2.244195 7.649607,-5.55625 v -4.988189 c -0.993775,-3.027098 -3.679375,-5.183452 -6.849719,-5.499629 v -2.268537 h -1.600385 v 2.268008 c -3.167962,0.314854 -5.852927,2.46671 -6.849692,5.490104 z"
+       style="display:inline;opacity:1;fill:none;fill-opacity:1;stroke:#0000ff;stroke-width:0.0264583;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+       id="path1191" />
+    <path
+       id="rect1288"
+       style="fill:none;stroke:#000000;stroke-width:0.0999992"
+       d="m 24.324636,28.183027 49.970201,0 c 0.04163,12.036485 0.04163,5.368272 0.04163,12.036485 v 25.827032 c 0,6.668213 -6.033738,12.036485 -13.52856,12.036485 H 24.324636 c 0,-12.583113 3.34e-4,-32.569368 0,-49.900002 z"
+       sodipodi:nodetypes="ccssscc" />
+  </g>
+</svg>

@@ -1,0 +1,118 @@
+5.1 Standard Scale Response Message
+Most of the host commands are responded to in the following message format.
+The only host commands that do not are the:
+Diagnostic, ABout and INformation commands
+
+<LF> <s> <r> <n> <m> <f> <xxxxxx.xxx> <uuu> <CR>
+  where: 
+    <LF> Start of response message
+    <s> scale status definition / example
+      ‘Z’ Center of Zero <xxxxxx.xxx>= 0.000
+      ‘O’ Over Capacity <xxxxxx.xxx>= +weight
+      ‘U’ Under Capacity <xxxxxx.xxx>= -weight
+      ‘E’ Zero Error (clears when condition clears)
+      ‘I’ Initial-Zero Error (if used, this error is maintained until zero condition is cleared)
+      ‘T’ Tare Error (clears after being read)
+      <space> None of the above conditions
+        Note: For ‘E’, ‘I’, ‘T’ error conditions, <xxxxxx.xxx>= ————— (center dashes)
+              and ‘Z’, ‘O’, ‘U’ are overridden.
+      Added characters:
+        'C' Calibration mode <xxxxxx.xxx> = weight to add to the bed
+    <r> range (‘1’, ‘2’, ‘3’, etc.) always ‘1’ for single range
+    <n> gross/net status
+      ‘G’ Gross normal weight
+      ‘T’ Tare weight (in response to ‘M’ command)
+      ‘N’ Net normal weight
+      ‘g’ gross weight in high-resolution
+      ‘n’ net weight in high-resolution
+    <m> motion status
+      ‘M’ scale in Motion
+      <space> scale not in Motion
+    <f> future reserved for future or custom use
+    <xxxxxx.xxx> weight data this field is fixed at 10 characters
+    <uuu> Unit of Measure
+    <CR> End of response message
+  
+  Examples:
+  Command Response
+  <LF>W<CR> <LF> <_> <1> <G> <_> <_> <_ _ _ _ 5.025> <lb_> <CR>
+  <LF>W<CR> <LF> <_> <1> <N> <_> <_> <_ _ _ _ 100000> <lb_> <CR>
+  <LF>W<CR> <LF> <_> <2> <G> <M> <_> <_ _ _ _ 8:08.5> <l/o> <CR>
+  <LF>H<CR> <LF> <_> <1> <g> <_> <_> <_ _ _ _5.0025> <lb_> <CR>
+  <LF>Z<CR> <LF> <Z> <1> <G> <_> <_> <_ _ _ _ _0.000> <lb_> <CR>
+  <LF>R<CR> <LF> <_> <1> <G> <_> <_> <_ _ _ _ 7.025> <kg_> <CR>
+  <LF> <_> <1> <G> <M> <_> <_ _ _ _ 7.650> <kg_> <CR>
+  o o o
+  <LF> <_> <1> <G> <_> <_> <_ _ _ _ 7.650> <kg_> <CR>
+  The scale will repeat weight until next command is received.
+
+5.2 Unrecognized Command Response
+Any host command that the scale does not recognize either because it is not supported by the
+implemented SMA level or because it is simply not a recognized command will be responded
+to by the scale with an ASCII ‘?’ question mark.
+<LF> ? <CR>
+
+5.3 Communication Error Response
+Any host command that the scale does not recognize due to a communication error will be
+responded to by the scale with an ASCII ‘!’ exclamation mark. This would include a parity
+error (if used), data framing error, or in the future a communication checksum error.
+<LF> ! <CR>
+
+5.4 Diagnostics Command Response
+When the scale is commanded to perform internal diagnostics, after the test is performed the
+following response is returned with the appropriate error indicators set or cleared.
+
+<LF> <r> <e> <c> <m> <CR>
+  where: 
+    <LF> Start of diagnostic response
+    <r> ‘R’ = RAM or ROM error, ‘_’ = OK,
+    <e> ‘E’ = EEPROM error, ‘_’ = OK
+    <c> ‘C’ = Calibration error, ‘_’ = OK
+    <m> Manufacturer specified, printable character, ‘_’ = OK
+    <CR> End of diagnostic message
+    
+  Example: With no errors!
+  Command: <LF>D<CR>
+  Response: <LF> <_> <_> <_> <_> <CR>
+  
+5.5 About ‘A’ and ‘B’ Command Response
+Response Format for ‘About’ commands A, B (variable length):
+  
+<LF><xxx>:<yyyyyy><CR>
+  where: 
+    <LF> Start of About response
+    <xxx> About field descriptor is fixed at 3 characters, is left justified, filled with blanks on the right side.
+      Following fields are required:
+        “SMA” compliance level/revision (response of ‘A’ command)
+        “MFG” manufacturer (response of 1st ‘B’ command)
+        “MOD” product model identification (response of 2nd ‘B’ command)
+        “REV” software revision as per manufacturer’s method (response of 3rd ‘B’ command)
+      The following are optional fields:
+        “SN_“ serial number (response of 4th ‘B’ command)
+        “OP1” manufacturer specified optional field (response of 5th ‘B’ command)
+        “OP2” manufacturer specified optional field (response of 6th ‘B’ command)
+        “OPn” manufacturer specified optional field (response of nth ‘B’ command)
+      “END” this is always the last About field (response of the last ‘B’ command)
+    ‘:’ Separator between field name and field contents.
+    <yyyyyy> About fields contain 25 characters maximum.
+      Required fields see above, SN field may be empty (if not supplied)
+      SMA field contents <level/revision>
+      where: 
+        level= (1, 2, etc.); revision= (1.0, 1.1, etc.)
+    <CR> End of About response
+  Note: All required fields must be supplied, but are free format,
+  printable characters, length is 25 characters maximum, and must
+  not be empty with the exception of the serial number field.
+  
+  The ‘A’ command also must reset the scale’s ‘B’ response pointer
+  to the first valid item (i.e. ‘MFG’ string info).
+  Example:
+  Command Response
+  <LF> A <CR> <LF>SMA:1/1.0 <CR>
+  <LF> B <CR> <LF>MFG:Weigh-Tronix, Corp. <CR>
+  <LF> B <CR> <LF>MOD:7620 <CR>
+  <LF> B <CR> <LF>REV:02-02 <CR>
+  <LF> B <CR> <LF>SN_:1234567890U812 <CR>
+  <LF> B <CR> <LF>END: <CR>
+  Note: if the host should ask for additional ‘B’ status then.
+  <LF> B <CR> <LF> ? <CR>

@@ -1,0 +1,6 @@
+[submodule "src/HX711"]
+	path = src/HX711
+	url = https://github.com/bogde/HX711.git
+[submodule "src/LiquidCrystal"]
+	path = src/LiquidCrystal
+	url = https://github.com/arduino-libraries/LiquidCrystal.git

@@ -1,0 +1,110 @@
+4.1 Request Displayed Weight (SMA#1)
+Command: <LF>W<CR>
+Response: Scale returns Weight and status information immediately.
+<LF><s><r><n><m><f><xxxxxx.xxx><uuu><CR>
+
+4.5 Request Scale to Zero (SMA#1)
+Command: <LF>Z<CR>
+Response: Scale attempts to zero itself and reports zero status in the <s> status indicator.
+Note: in many locations latching the scale zero command is not permitted.
+The specific conditions for scale zeroing will meet proper Weights and Measures
+criteria.
+<LF><s><r><n><m><f><xxxxxx.xxx><uuu><CR>
+
+4.6 Request Scale to Tare
+Command: <LF>T<CR>
+Response: Scale attempts to tare itself using the weight on the scale display and reports
+the tare status in the <s> and <n> status indicators. If a tare error occurred this
+is only a momentary error status indicator and will be cleared on the next
+command cycle.
+Note: in many locations latching the scale Tare command is not permitted.
+The specific conditions for scale tare will meet proper Weights and Measures
+criteria.
+<LF><s><r><N><m><f><xxxxxx.xxx><uuu><CR>
+
+4.7 Set Scale Tare Weight
+Command: <LF>T<xxxxxx.xxx><CR>
+Response: Scale attempts to take the <xxxxxx.xxx> data as the tare weight and reports
+the tare status in the <s> and <n> status indicators. If a tare error occurred this
+is only a momentary error status indicator and will be cleared on the next
+command cycle.
+<LF><s><r><N><m><f><xxxxxx.xxx><uuu><CR>
+
+4.8 Return Tare Weight
+Command: <LF>M<CR>
+Response: Scale returns tare weight stored in scale Memory and identifies the weight as
+tare in the <n> status indicator.
+<LF><s><r><T><m><f><xxxxxx.xxx><uuu><CR>
+
+4.9 Clear Scale Tare Weight
+Command: <LF>C<CR>
+Response: Scale Clears tare weight and reports the tare status in the <n> status indicator.
+<LF><s><r><G><m><f><xxxxxx.xxx><uuu><CR>
+
+4.12 Invoke Scale Diagnostics (SMA#1)
+Command: <LF>D<CR>
+Response: The scale runs scale diagnostics and sends a diagnostic response message with
+the results of the tests.
+See Section 5.4 for response details.
+<LF><r><e><c><m><CR>
+
+4.13 About Scale First Line (SMA#1)
+Command: <LF>A<CR>
+Response: The scale will send the first line of the About scale data.
+See Section 5.5 for response details.
+<LF><SMA>:<yyyyyy><CR>
+
+4.14 About Scale Scroll (SMA#1)
+Command: <LF>B<CR>
+Response: The scale will send the rest of the ABout the scale data.
+See Section 5.5 for response details.
+<LF><MFG>:<yyyyyy><CR>
+
+4.17 Extended Command Set (custom)
+Command: <LF>Xc<CR>
+Response: This is the only two-character command in this protocol. It is intended for the
+manufacturer to extend or customize the protocol for uses outside the scope of
+this standard.
+‘c’ is any printable ASCII character the manufacturer desires.
+<LF><manufacturers specified response><CR>
+  Command: <LF>XC<CR>
+  Response: Scale clears tare weight, zeros, then reports the expected weight to
+  add. It measures for 2 minutes, then determines the new sensitivity, reporting 
+  the new measured weight after completion.
+  <LF><C><r><G><m><f><xxxxxx.xxx><uuu><CR>
+  2 minutes...
+  <LF><s><r><G><m><f><xxxxxx.xxx><uuu><CR>
+  
+  Command: <LF>XC<xxxxxx.xxx><CR>
+  Response: Scale clears tare weight, zeros, then uses the provided weight to
+  calibrate (reports back for verification). It measures for 2 minutes, then 
+  determines the new sensitivity, reporting the new measured weight after 
+  completion.
+  <LF><C><r><G><m><f><xxxxxx.xxx><uuu><CR>
+  2 minutes...
+  <LF><s><r><G><m><f><xxxxxx.xxx><uuu><CR>
+
+4.18 Abort Command (SMA#1)
+Command: <ESC>
+Response: This is the only command that the scale receives which does not follow the
+<LF>c<CR> protocol and does not have a response. This was implemented
+this way so that the <ESC> character can be detected at the scales “*Data
+Link Layer” and a software reset generated regardless of what the scale is
+doing at the time. This software reset should reset the communication hardware
+and clear any pending commands that the scale is acting on. This command
+is needed to reset the scale if the host has commanded the scale to
+perform an operation that has taken longer than the host is willing to wait.
+After the <ESC> command is issued the host should wait several seconds
+before trying to communicate with the scale to ensure the scale has completed
+its software reset cycle. It is recommended that the host then issue a simple
+“About” command ‘A’ to validate that the scale is again communicating
+properly.
+*Reference Seven Layer ISO Communication Model
+
+4.19.1 Repeat Displayed Weight Continuously
+Command: <LF>R<CR>
+Response: Scale Repeats weight and status information continuously until another
+command is received.
+<LF><s><r><n><m><f><xxxxxx.xxx><uuu><CR>
+
+

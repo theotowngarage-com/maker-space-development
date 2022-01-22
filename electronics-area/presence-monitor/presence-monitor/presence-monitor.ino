@@ -17,7 +17,7 @@
 #include <include/WiFiState.h> // WiFiState structure details
 #include <DallasTemperature.h>
 
-//#define DEBUG  // prints WiFi connection info to serial, uncomment if you want WiFi messages
+#define DEBUG  // prints WiFi connection info to serial, uncomment if you want WiFi messages
 #ifdef DEBUG
 #define DEBUG_PRINTLN(x)  Serial.println(x)
 #define DEBUG_PRINT(x)  Serial.print(x)
