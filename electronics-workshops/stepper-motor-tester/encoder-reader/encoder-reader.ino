@@ -31,8 +31,8 @@ void setup() {
   // configure stepper motors
   pinMode (STEPPER1_EN_PIN,OUTPUT);
   pinMode (STEPPER2_EN_PIN,OUTPUT);
-  digitalWrite (STEPPER1_EN_PIN, HIGH);
-  digitalWrite (STEPPER2_EN_PIN, HIGH);
+  digitalWrite (STEPPER1_EN_PIN, LOW);
+  digitalWrite (STEPPER2_EN_PIN, LOW);
   
   stepper1.setMaxSpeed(10000.0);
   stepper1.setAcceleration(500000.0);
@@ -42,16 +42,20 @@ void setup() {
 
   steppers.addStepper(stepper1);
   steppers.addStepper(stepper2);
+  stepper1.setSpeed(0);
+  stepper2.setSpeed(0);
 }
 
+bool useEncoder = true;
 long lastPosition  = -999;
 
 void loop() {
   long newValue;
   newValue = encoderInput.read();
   if (newValue != lastPosition) {
-    if(stepper1.isRunning()) {
+    if(useEncoder) {
       stepper1.setSpeed(newValue);
+      stepper2.setSpeed(newValue);
 //      Serial.print("Set speed = ");
 //      Serial.print(newValue);
 //      Serial.println();
@@ -71,6 +75,7 @@ void loop() {
     }   
     else if (inputString=="xoff\n"){
       ENAXOFF();
+      useEncoder = false;
     }
     else if (inputString=="stop\n"){
       stepper1.stop();
@@ -78,9 +83,11 @@ void loop() {
       inputString = "";
     }
     else if (inputString.charAt(0)=='s'){
+      useEncoder = true;
       MSpeed();
     }
     else if (inputString.charAt(0)=='x'){
+      useEncoder = false;
       NextX();
     } 
     
