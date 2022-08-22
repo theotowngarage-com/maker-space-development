@@ -2,15 +2,15 @@
 #include <NeoPixelAnimator.h>
 
 constexpr uint16_t PixelCount = 125;
-const RgbwColor DotColor = RgbwColor(0, 0, 10, 90);
 
 NeoPixelBus<NeoRgbwFeature, Neo800KbpsMethod> strip(PixelCount, 6);
 
-NeoPixelAnimator animations(2);
-AnimEaseFunction moveEase = NeoEase::ExponentialInOut; // QuinticInOut, QuarticInOut, CubicInOut, QuadraticInOut, ExponentialInOut
+NeoPixelAnimator animations(3);
+AnimEaseFunction moveEase = NeoEase::QuinticInOut; // QuinticInOut, QuarticInOut, CubicInOut, QuadraticInOut, ExponentialInOut
 
 int moveDirection = 1;
 uint16_t lastPixel = 0; // track the eye position
+float pixelHue = 0;
 
 void FadeAll(uint8_t darkenBy)
 {
@@ -34,7 +34,7 @@ void FadeAnimUpdate(const AnimationParam& param)
 
 RgbwColor getColor(uint16_t position)
 {
-    return HslColor((float)position / PixelCount, 1, 0.3);
+    return HslColor((float)position / PixelCount + pixelHue, 1, 0.3);
 }
 
 void MoveAnimUpdate(const AnimationParam& param)
@@ -74,10 +74,20 @@ void MoveAnimUpdate(const AnimationParam& param)
     }
 }
 
+void ColorChangeAnimUpdate(const AnimationParam& param) {
+    pixelHue = param.progress;
+    
+    if(param.state == AnimationState_Completed) {
+        animations.RestartAnimation(param.index);
+        pixelHue = 0;
+    }
+}
+
 void SetupAnimations()
 {
-    animations.StartAnimation(0, 4, FadeAnimUpdate);
-    animations.StartAnimation(1, 1000, MoveAnimUpdate);
+    animations.StartAnimation(0, 6, FadeAnimUpdate);
+    animations.StartAnimation(1, 300, MoveAnimUpdate);
+    animations.StartAnimation(2, 10000, ColorChangeAnimUpdate);
 }
 
 void setup() {
