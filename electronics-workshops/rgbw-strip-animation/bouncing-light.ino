@@ -67,11 +67,13 @@ void MoveAnimUpdate(const AnimationParam& param)
 }
 
 void ColorChangeAnimUpdate(const AnimationParam& param) {
-    pixelHue = param.progress;
+    // pause color change when pin 5 is held down
+    if(digitalRead(5) == HIGH) {
+        pixelHue = param.progress;
+    } 
     
     if(param.state == AnimationState_Completed) {
         animations.RestartAnimation(param.index);
-        pixelHue = 0;
     }
 }
 
@@ -85,6 +87,9 @@ void SetupAnimations()
 void setup() {
     strip.Begin();
     strip.Show();
+
+    // pause color change when pin 5 is held down
+    pinMode(5, INPUT);
 
     SetupAnimations();
 }
