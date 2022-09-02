@@ -51,16 +51,18 @@ class Stepper:
                 self.step.value(1)
             await uasyncio.sleep(STEP_TIME)
 
-def open_lock(stepper):
+async def open_lock(stepper):
     encoder = Encoder(ENCODER_IN)
-    asyc_loop.run_until_complete(stepper.move(1, OPEN_STEPS))
+    await stepper.move(1, OPEN_STEPS)
+    # print("Encoder count: {}".format(encoder.read()))
+    # await uasyncio.sleep(2)
     print("Encoder count: {}".format(encoder.read()))
     if(encoder.read() < OPEN_MIN_COUNT):
         print("Lock did not open fully")
 
-def close_lock(stepper):
+async def close_lock(stepper):
     encoder = Encoder(ENCODER_IN)
-    asyc_loop.run_until_complete(stepper.move(0, OPEN_STEPS))
+    await stepper.move(0, OPEN_STEPS)
     print("Encoder count: {}".format(encoder.read()))
     if(encoder.read() < OPEN_MIN_COUNT):
         print("Lock did not close fully")
@@ -75,13 +77,13 @@ async def main():
     await uasyncio.sleep(1)
     print("Opening lock")
     # Open the lock
-    open_lock(stepper)
+    await open_lock(stepper)
     print("Lock opened")
 
     await uasyncio.sleep(5)
     # Close the lock
     print("Closing lock")
-    close_lock(stepper)
+    await close_lock(stepper)
 
     print("Done")
 
