@@ -7,85 +7,98 @@ import machine
 #   STEPPER_STEP: Step pin for the stepper motor
 
 OPEN_STEPS = 3 * 1600
-STEPPER_DIR = 18
-STEPPER_STEP = 19
+STEPPER_DIRECTION_PIN = 18
+STEPPER_STEP_PIN = 19
 STEP_TIME = 2 / 1600
 
-ENCODER_IN = 21
+ENCODER_IN_PIN = 21
 OPEN_MIN_COUNT = 50
 
-asyc_loop = uasyncio.get_event_loop()
-
-class Encoder:
+class AsyncEncoder:
     def __init__(self, pin):
         self.pin = machine.Pin(pin, machine.Pin.IN)
         self.count = 0
         self.prev_state = self.pin.value()
-        self.thread = asyc_loop.create_task(self._thread())
+        self.thread = uasyncio.create_task(self.__thread())
 
-    def update(self):
+    def __update(self):
         state = self.pin.value()
         if(state != self.prev_state):
             self.count += 1
             self.prev_state = state
     
-    async def _thread(self):
+    async def __thread(self):
         while True:
-            self.update()
+            self.__update()
             await uasyncio.sleep_ms(1)
 
     def read(self):
         return self.count
+    
+    def reset(self):
+        self.count = 0
 
-class Stepper:
-    def __init__(self, dir, step):
-        self.dir = machine.Pin(dir, machine.Pin.OUT)
-        self.step = machine.Pin(step, machine.Pin.OUT)
+class AsyncStepper:
+    def __init__(self, direction_pin, step_pin):
+        self.direction_pin = machine.Pin(direction_pin, machine.Pin.OUT)
+        self.step_pin = machine.Pin(step_pin, machine.Pin.OUT)
 
     async def move(self, direction, steps):
-        self.dir.value(direction)
+        self.direction_pin.value(direction)
         for i in range(steps):
-            if(self.step.value() == 1):
-                self.step.value(0)
+            if(self.step_pin.value() == 1):
+                self.step_pin.value(0)
             else:
-                self.step.value(1)
+                self.step_pin.value(1)
             await uasyncio.sleep(STEP_TIME)
 
-async def open_lock(stepper):
-    encoder = Encoder(ENCODER_IN)
-    await stepper.move(1, OPEN_STEPS)
-    # print("Encoder count: {}".format(encoder.read()))
-    # await uasyncio.sleep(2)
-    print("Encoder count: {}".format(encoder.read()))
-    if(encoder.read() < OPEN_MIN_COUNT):
-        print("Lock did not open fully")
+class AsyncMotorizedLock:
+    def __init__(self, stepper, encoder):
+        self.stepper = stepper
+        self.encoder = encoder
 
-async def close_lock(stepper):
-    encoder = Encoder(ENCODER_IN)
-    await stepper.move(0, OPEN_STEPS)
-    print("Encoder count: {}".format(encoder.read()))
-    if(encoder.read() < OPEN_MIN_COUNT):
-        print("Lock did not close fully")
+    async def open_lock(self):
+        self.encoder.reset()
+        await self.stepper.move(1, OPEN_STEPS)
+        print("Encoder count: {}".format(self.encoder.read()))
+        if(self.encoder.read() < OPEN_MIN_COUNT):
+            return False
+        return True
+
+    async def close_lock(self):
+        self.encoder.reset()
+        await self.stepper.move(0, OPEN_STEPS)
+        print("Encoder count: {}".format(self.encoder.read()))
+        if(self.encoder.read() < OPEN_MIN_COUNT):
+            return False
+        return True
 
 async def main():
     print("Starting lock test")
     # Create an instance of the stepper class
-    stepper = Stepper(STEPPER_DIR, STEPPER_STEP)
+    encoder = AsyncEncoder(ENCODER_IN_PIN)
+    stepper = AsyncStepper(STEPPER_DIRECTION_PIN, STEPPER_STEP_PIN)
+    lock = AsyncMotorizedLock(stepper, encoder)
     
     print("Starting lock test 2")
 
     await uasyncio.sleep(1)
     print("Opening lock")
     # Open the lock
-    await open_lock(stepper)
-    print("Lock opened")
+    if not await lock.open_lock():
+        print("Lock did not open")
+    else:
+        print("Lock opened")
 
     await uasyncio.sleep(5)
     # Close the lock
     print("Closing lock")
-    await close_lock(stepper)
+    if not await lock.close_lock():
+        print("Lock did not close")
+    else:
+        print("Lock closed")
 
     print("Done")
 
 print("Starting main")
-asyc_loop.run_until_complete(main())
+uasyncio.get_event_loop().run_until_complete(main())
