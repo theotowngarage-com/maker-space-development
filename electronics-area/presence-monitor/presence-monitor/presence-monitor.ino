@@ -202,7 +202,7 @@ void loop() {
       nv->rtcData.connectFailures++;
     }
     // Save current wifi state to nvram
-    if(!WiFi.mode(WIFI_SHUTDOWN, &nv->wss)) {
+    if(!WiFi.shutdown(nv->wss)) {
       Serial.println(F("ERROR: Failed to go to WIFI_SHUTDOWN"));
     }
   }
@@ -266,7 +266,7 @@ bool initWiFi() {
   digitalWrite(LED_BUILTIN, LOW);  // give a visual indication that we're alive but busy with WiFi
   uint32_t wifiBegin = millis();  // how long does it take to connect
   Serial.println(F("INFO: resuming WiFi"));
-  if (!WiFi.mode(WIFI_RESUME, &nv->wss)) {  // couldn't resume, or no valid saved WiFi state yet
+  if (!WiFi.resumeFromShutdown(nv->wss) || (WiFi.waitForConnectResult(10000) != WL_CONNECTED)) {  // couldn't resume, or no valid saved WiFi state yet
     /* Explicitly set the ESP8266 as a WiFi-client (STAtion mode), otherwise by default it
       would try to act as both a client and an access-point and could cause network issues
       with other WiFi devices on your network. */

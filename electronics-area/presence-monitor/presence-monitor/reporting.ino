@@ -6,7 +6,7 @@ const char * myWriteAPIKey = SECRET_WRITE_APIKEY;
 WiFiClient  client;
 
 bool beginReporting() {
-    ThingSpeak.begin(client);
+    return ThingSpeak.begin(client);
 }
 
 int sendReport(ReportData *pData) {
