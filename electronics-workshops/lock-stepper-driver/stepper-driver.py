@@ -9,6 +9,7 @@ import machine
 OPEN_STEPS = 3 * 1600
 STEPPER_DIRECTION_PIN = 18
 STEPPER_STEP_PIN = 19
+MOTOR_ENABLE_PIN = 5
 STEP_TIME = 2 / 1600
 
 ENCODER_IN_PIN = 21
@@ -39,11 +40,14 @@ class AsyncEncoder:
         self.count = 0
 
 class AsyncStepper:
-    def __init__(self, direction_pin, step_pin):
+    def __init__(self, direction_pin, step_pin, enable_pin):
         self.direction_pin = machine.Pin(direction_pin, machine.Pin.OUT)
         self.step_pin = machine.Pin(step_pin, machine.Pin.OUT)
+        self.enable_pin = machine.Pin(enable_pin, machine.Pin.OUT)
+        self.enable_pin.value(1)
 
     async def move(self, direction, steps):
+        self.enable_pin.value(0)
         self.direction_pin.value(direction)
         for i in range(steps):
             if(self.step_pin.value() == 1):
@@ -51,6 +55,7 @@ class AsyncStepper:
             else:
                 self.step_pin.value(1)
             await uasyncio.sleep(STEP_TIME)
+        self.enable_pin.value(1)
 
 class AsyncMotorizedLock:
     def __init__(self, stepper, encoder):
@@ -77,7 +82,7 @@ async def main():
     print("Starting lock test")
     # Create an instance of the stepper class
     encoder = AsyncEncoder(ENCODER_IN_PIN)
-    stepper = AsyncStepper(STEPPER_DIRECTION_PIN, STEPPER_STEP_PIN)
+    stepper = AsyncStepper(STEPPER_DIRECTION_PIN, STEPPER_STEP_PIN, MOTOR_ENABLE_PIN)
     lock = AsyncMotorizedLock(stepper, encoder)
     
     print("Starting lock test 2")
